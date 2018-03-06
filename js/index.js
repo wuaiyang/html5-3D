@@ -1,6 +1,5 @@
 (function () {
-    //setLoding();
-    anmt5();
+    setLoding();
     setPerc();
 })();
 
@@ -289,6 +288,10 @@ function setDarg() {
     var lastDeg = {x:0, y:0};
     var lastDis = {x:0, y:0};
     document.addEventListener('touchstart',function (e) {
+        window.isTouch =true;
+        clearInterval(pano.timer);
+        clearInterval(panoBg.timer);
+        clearInterval(tz.timer);
         startPoint.x = e.changedTouches[0].pageX;
         startPoint.y = e.changedTouches[0].pageY;
         panoBgDeg.x = css(panoBg, 'rotateY');
@@ -340,20 +343,24 @@ function setDarg() {
         MTween({
             el: tz,
             target: {translateZ:startZ},
-            time: 800,
+            time: 700,
             type: 'easeOut'
         });
         MTween({
             el: panoBg,
             target: {rotateY:nowDeg.x + disDeg.x},
-            time: 800,
+            time: 700,
             type: 'easeOut'
         });
         MTween({
             el: pano,
             target: {rotateY:nowDeg.x + disDeg.x},
-            time: 800,
-            type: 'easeOut'
+            time: 700,
+            type: 'easeOut',
+            callBack: function () {
+                window.isTouch =false;
+                window.isStart =false;
+            }
         });
     })
 }
@@ -393,94 +400,106 @@ function setDarg() {
 }*/
 
 function setSensors() {
+    var tz = document.querySelector('#tz');
     var pano = document.querySelector('#pano');
     var panoBg = document.querySelector('#panoBg');
-    var last = {x:0,y:0};
-    var isStart = false;
     var start = {};
     var now = {};
     var startEl = {};
+    var lastTime = Date.now();
+    var scale = 129/18;
+    var startZ = -200;
+    var dir = window.orientation
+    window.isTouch = false;
+    window.isStart = false;
+    window.addEventListener('orientationchange',function (e) {
+        dir = window.orientation;
+    });
     window.addEventListener('deviceorientation',function (e) {
-        var x = e.beta;
-        var y = e.alpha;
-
-        if(Math.abs(x - last.x)>1 || Math.abs(y - last.y)>1){
-            if(isStart){ //move
-                now.x = x;
-                now.y = y;
-                var dis = {}
-                dis.x = now.x - start.x;
-                dis.y = now.y + start.y;
-                var deg = {};
-                deg.x = startEl.x - dis.x;
-                deg.y = startEl.y - dis.y;
-                if(deg.x > 40){
-                    deg.x = 40;
-                }else if(deg.x < -40){
-                    deg.x = -40;
-                }
-
-                //css(pano,'rotateX',deg.x);
-                //css(pano,'rotateY',deg.y);
-                //css(panoBg,'rotateX',deg.x);
-                //css(panoBg,'rotateY',deg.y);
-                MTween({
-                    el:pano,
-                    target:{rotateX : deg.x, rotateY: deg.y},
-                    time:1000,
-                    type:'easeBoth'
-                });
-                MTween({
-                    el:panoBg,
-                    target:{rotateX : deg.x, rotateY: deg.y},
-                    time:1000,
-                    type:'easeBoth'
-                })
-            }else{
-                isStart = true; //start
-                start.x = x;
-                start.y = y;
-                startEl.x =  css(pano,'rotateX');
-                startEl.y =  css(pano,'rotateY');
-            }
-            last.x = x;
-            last.y = y;
-        } else {
-            if(isStart){
-                isStart = false; //end
-                now.x = x;
-                now.y = y;
-                var dis = {}
-                dis.x = now.x - start.x;
-                dis.y = now.y + start.y;
-                var deg = {};
-                deg.x = startEl.x - dis.x;
-                deg.y = startEl.y - dis.y;
-                if(deg.x > 40){
-                    deg.x = 40;
-                }else if(deg.x < -40){
-                    deg.x = -40;
-                }
-
-                //css(pano,'rotateX',deg.x);
-                //css(pano,'rotateY',deg.y);
-                //css(panoBg,'rotateX',deg.x);
-                //css(panoBg,'rotateY',deg.y);
-                MTween({
-                    el:pano,
-                    target:{rotateX : deg.x, rotateY: deg.y},
-                    time:1000,
-                    type:'easeBoth'
-                });
-                MTween({
-                    el:panoBg,
-                    target:{rotateX : deg.x, rotateY: deg.y},
-                    time:1000,
-                    type:'easeBoth'
-                })
-            }
+        if(window.isTouch){
+            return;
+        }
+        //dir = 0;
+        switch (dir){
+            case 0:
+                var x = e.beta;
+                var y = e.alpha;
+                break;
+            case 180:
+                var x = -e.beta;
+                var y = -e.alpha;
+                break;
+            case 90:
+                var y = e.beta;
+                var x = e.alpha;
+                break;
+            case -90:
+                var y = -e.beta;
+                var x = -e.alpha;
+                break;
         }
 
+        var nowTime = Date.now();
+        if(nowTime - lastTime < 30){
+            return;
+        }
+        lastTime = nowTime;
+        if(!window.isStart){//start
+            window.isStart = true;
+            start.x = x;
+            start.y = y;
+            startEl.x =  css(pano,'rotateX');
+            startEl.y =  css(pano,'rotateY');
+        } else {//move
+            now.x = x;
+            now.y = y;
+            var dis = {}
+            dis.x = now.x - start.x;
+            dis.y = now.y + start.y;
+            var deg = {};
+            deg.x = startEl.x - dis.x;
+            deg.y = startEl.y - dis.y;
+            if(deg.x > 40){
+                deg.x = 40;
+            }else if(deg.x < -40){
+                deg.x = -40;
+            }
+            var disXZ = Math.abs(Math.round((deg.x - css(pano,'rotateX'))*scale));
+            var disYZ = Math.abs(Math.round((deg.y - css(pano,'rotateY'))*scale));
+            var disZ = Math.max(disXZ,disYZ);
+            if(disZ > 300){
+                disZ = 300;
+            }
+            css(tz,"translateZ",startZ - disZ);
+
+            MTween({
+                el:tz,
+                target:{translateZ :startZ - disZ},
+                time:300,
+                type:'easeBoth',
+                callBack: function () {
+                    MTween({
+                        el:tz,
+                        target:{translateZ :startZ },
+                        time:400,
+                        type:'easeBoth',
+                    })
+                }
+            });
+
+            MTween({
+                el:pano,
+                target:{rotateX : deg.x, rotateY: deg.y},
+                time:1000,
+                type:'easeBoth'
+            });
+            MTween({
+                el:panoBg,
+                target:{rotateX : deg.x, rotateY: deg.y},
+                time:1000,
+                type:'easeBoth'
+            })
+        }
     })
 }
 
